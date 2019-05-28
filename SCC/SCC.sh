@@ -1,0 +1,6 @@
+time curl -X GET 'http://127.0.0.1:9000/query/AntiFraud/DCSC?maxDepth=10'
+curl -X GET 'http://127.0.0.1:9000/query/AntiFraud/num_updated'
+time curl -X GET 'http://127.0.0.1:9000/query/AntiFraud/DCSC?maxDepth=10'
+curl -X GET 'http://127.0.0.1:9000/query/AntiFraud/num_updated'
+time curl -X GET 'http://127.0.0.1:9000/query/AntiFraud/DCSC?maxDepth=10'
+curl -X GET 'http://127.0.0.1:9000/query/AntiFraud/num_updated'

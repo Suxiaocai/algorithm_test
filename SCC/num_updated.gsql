@@ -1,0 +1,14 @@
+USE GRAPH AntiFraud
+DROP QUERY num_updated
+CREATE QUERY num_updated(/* Parameters here */) FOR GRAPH AntiFraud{ 
+        FLOAT n;
+        Start = {User.*, Transaction.*};
+        n=Start.size();
+        Start = SELECT s
+                FROM Start:s
+                WHERE s.score != 0;
+        print Start.size()*1.0/n;
+        
+}
+
+INSTALL QUERY num_updated
