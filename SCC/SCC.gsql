@@ -9,22 +9,25 @@ CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH A
         log(TRUE, "[DCSC]", depth);
         IF subgraph.size() > 1 AND depth <= maxDepth THEN
                 G = {subgraph};
-                # pick one vertex
+                # pick one vertex in the subgraph
                 V = SELECT s
                     FROM G:s
                     ACCUM s.@inG = TRUE
                     LIMIT 1;
                 V = SELECT s
                     FROM V:s
-                    ACCUM cid = getvid(s);
+                    ACCUM cid = getvid(s),
+	                        @@pred += s,
+	                        @@desc += s;
         
                 Start = V;
                 WHILE Start.size()>0 DO 
+	                      # traverse reverse edge to predecessors
                         Start = SELECT t
-                                FROM Start:s -((User_Referred_By_User|User_Recieve_Transaction_Rev|User_Transfer_Transaction_Rev):e) ->:t 
+                                FROM Start:s -((User_Referred_By_User|User_Recieve_Transaction_Rev|User_Transfer_Transaction_Rev):e) ->:t   
                                 WHERE t.@inG == TRUE AND t.@visited == FALSE
                                 ACCUM t.@visited = TRUE,
-                                      @@pred += t;
+                                      @@pred += t;   # add reachable vertices into @@pred set
                 END;
           
                 G = SELECT s
@@ -33,23 +36,24 @@ CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH A
         
                 Start = V;
                 WHILE Start.size()>0 DO 
+	                      # traverse to descendants
                         Start = SELECT t
-                                FROM Start:s -((User_Refer_User|User_Recieve_Transaction|User_Transfer_Transaction):e) ->:t 
+                                FROM Start:s -((User_Refer_User|User_Recieve_Transaction|User_Transfer_Transaction):e) ->:t    
                                 WHERE t.@inG == TRUE AND t.@visited == FALSE
                                 ACCUM t.@visited = TRUE,
-                                      @@desc += t;
+                                      @@desc += t;  # add reachable vertices into @@desc set
                 END;
                   
-                SCC = @@pred INTERSECT @@desc;
+                SCC = @@pred INTERSECT @@desc;   # the intersection of predecessors and descendants is a SCC
                 SCC = SELECT s
                       FROM SCC:s 
                       POST-ACCUM s.score = cid;
-                Pred = {@@pred};
+                Pred = {@@pred};   # transform to vSet to do set calculation
                 Pred = Pred MINUS SCC;
                 @@pred.clear();
                 Pred = SELECT s
                        FROM Pred:s
-                       ACCUM @@pred += s;
+                       ACCUM @@pred += s;  # transform to accumulator to call it as parameter
         
                 DCSC_sub(@@pred, maxDepth, depth+1);
         
@@ -78,8 +82,8 @@ CREATE QUERY DCSC(INT maxDepth) FOR GRAPH AntiFraud {
         Start = {User.*, Transaction.*};
         Start = SELECT s
                 FROM Start:s
-                ACCUM @@g += s
-                POST-ACCUM s.score = getvid(s);
+	              WHERE s.score == 0
+                ACCUM @@g += s;
         DCSC_sub(@@g, maxDepth, 1);
 }
 
