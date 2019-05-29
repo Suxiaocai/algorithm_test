@@ -8,7 +8,7 @@ CREATE QUERY num_updated(/* Parameters here */) FOR GRAPH AntiFraud{
                 FROM Start:s
                 WHERE s.score != 0;
         print Start.size()*1.0/n;
+	print Start.size();
         
 }
-
 INSTALL QUERY num_updated
