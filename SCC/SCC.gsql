@@ -5,6 +5,8 @@ drop query DCSC_sub
 CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH AntiFraud RETURNS (INT){ 
         SetAccum<VERTEX> @@pred, @@desc, @@rem;
         OrAccum @visited, @inG;
+        SumAccum<INT> @indegree, @outdegree;
+        OrAccum @@flag = true;
         INT cid;
         log(TRUE, "[DCSC]", depth);
         IF subgraph.size() > 1 AND depth <= maxDepth THEN
