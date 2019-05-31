@@ -9,6 +9,30 @@ CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH A
         log(TRUE, "[DCSC]", depth);
         IF subgraph.size() > 1 AND depth <= maxDepth THEN
                 G = {subgraph};
+                G = SELECT s 
+                    FROM G:s
+                    ACCUM s.@indegree += s.outdegree("User_Refer_User"),
+                          s.@outdegree += s.outdegree("User_Referred_By_User");
+                    WHILE @@flag == true DO    
+                        G_rm = SELECT s
+                               FROM G:s
+                               WHERE s.@indegree == 0 OR s.@outdegree==0
+                               POST-ACCUM s.score = getvid(s);
+                         
+                        IF G_rm.size() == 0 THEN
+                             @@flag = false;
+                        ELSE 
+                             G= G MINUS G_rm;
+                               s1 = SELECT t
+                                    FROM G_rm:s - (User_Refer_User:e) -> :t
+                                    ACCUM t.@indegree = t.@indegree-1;
+                               s2 = SELECT t
+                                    FROM G_rm:s - (User_Referred_By_User:e) -> :t
+                                    ACCUM t.@outdegree = t.@outdegree-1;
+                        END;
+                    END;
+
+
                 # pick one vertex in the subgraph
                 V = SELECT s
                     FROM G:s
