@@ -1,38 +1,54 @@
+
 use graph AntiFraud
 drop query DCSC
 drop query DCSC_sub
 
+
 CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH AntiFraud RETURNS (INT){ 
         SetAccum<VERTEX> @@pred, @@desc, @@rem;
-        OrAccum @visited, @inG;
+        OrAccum @visited, @inG, @inP;
+        SumAccum<INT> @indegree, @outdegree;
+        OrAccum @@flag;
+
         INT cid;
         log(TRUE, "[DCSC]", depth);
         IF subgraph.size() > 1 AND depth <= maxDepth THEN
                 G = {subgraph};
-                G = SELECT s 
+                G = SELECT s
                     FROM G:s
-                    ACCUM s.@indegree += s.outdegree("User_Refer_User"),
-                          s.@outdegree += s.outdegree("User_Referred_By_User");
-                    WHILE @@flag == true DO    
+                    ACCUM s.@inP = TRUE;
+                G1 = SELECT s
+                      FROM G:s - (User_Refer_User:e)->:t
+                      WHERE t.@inP == TRUE
+                      ACCUM s.@outdegree += 1;
+    
+                G2 = SELECT s
+                      FROM G:s - (User_Referred_By_User:e)->:t
+                      WHERE t.@inP==TRUE
+                      ACCUM s.@indegree +=1;    
+                @@flag = TRUE;
+                WHILE @@flag == TRUE DO
+                        #Get the vertices either have 0 indegree or 0 outdegree 
                         G_rm = SELECT s
-                               FROM G:s
-                               WHERE s.@indegree == 0 OR s.@outdegree==0
-                               POST-ACCUM s.score = getvid(s);
-                         
+                                FROM G:s
+                                WHERE s.@indegree == 0 OR s.@outdegree==0
+                                POST-ACCUM s.score = getvid(s);
+
+                        print G_rm.size();
+               
                         IF G_rm.size() == 0 THEN
-                             @@flag = false;
-                        ELSE 
-                             G= G MINUS G_rm;
-                               s1 = SELECT t
+                                @@flag = FALSE;
+                        ELSE
+                                G = G MINUS G_rm;
+                                s1 = SELECT t
                                     FROM G_rm:s - (User_Refer_User:e) -> :t
-                                    ACCUM t.@indegree = t.@indegree-1;
-                               s2 = SELECT t
+                                    ACCUM t.@indegree += -1;
+                                s2 = SELECT t
                                     FROM G_rm:s - (User_Referred_By_User:e) -> :t
-                                    ACCUM t.@outdegree = t.@outdegree-1;
+                                    ACCUM t.@outdegree += -1;                   
                         END;
-                    END;
-
-
+                  END;
+  
                 # pick one vertex in the subgraph
                 V = SELECT s
                     FROM G:s
@@ -41,14 +57,14 @@ CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH A
                 V = SELECT s
                     FROM V:s
                     ACCUM cid = getvid(s),
-	                        @@pred += s,
-	                        @@desc += s;
+                          @@pred += s,
+                          @@desc += s;
         
                 Start = V;
                 WHILE Start.size()>0 DO 
-	                      # traverse reverse edge to predecessors
+                        # traverse reverse edge to predecessors
                         Start = SELECT t
-                                FROM Start:s -((User_Referred_By_User|User_Recieve_Transaction_Rev|User_Transfer_Transaction_Rev):e) ->:t   
+                                FROM Start:s -(User_Referred_By_User:e) ->:t   
                                 WHERE t.@inG == TRUE AND t.@visited == FALSE
                                 ACCUM t.@visited = TRUE,
                                       @@pred += t;   # add reachable vertices into @@pred set
@@ -60,9 +76,9 @@ CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH A
         
                 Start = V;
                 WHILE Start.size()>0 DO 
-	                      # traverse to descendants
+                        # traverse to descendants
                         Start = SELECT t
-                                FROM Start:s -((User_Refer_User|User_Recieve_Transaction|User_Transfer_Transaction):e) ->:t    
+                                FROM Start:s -(User_Refer_User:e) ->:t    
                                 WHERE t.@inG == TRUE AND t.@visited == FALSE
                                 ACCUM t.@visited = TRUE,
                                       @@desc += t;  # add reachable vertices into @@desc set
@@ -101,15 +117,19 @@ CREATE QUERY DCSC_sub(Set<VERTEX> subgraph, INT maxDepth, INT depth) FOR GRAPH A
         END;
 }
 
+
 CREATE QUERY DCSC(INT maxDepth) FOR GRAPH AntiFraud { 
         SetAccum<VERTEX> @@g;
-        Start = {User.*, Transaction.*};
+        Start = {User.*};
         Start = SELECT s
                 FROM Start:s
-	              WHERE s.score == 0
+                  WHERE s.score == -1
                 ACCUM @@g += s;
+          print Start.size();
         DCSC_sub(@@g, maxDepth, 1);
 }
 
 install query DCSC_sub
 install query DCSC
+
+
