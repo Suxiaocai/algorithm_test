@@ -6,7 +6,7 @@ CREATE QUERY num_updated(/* Parameters here */) FOR GRAPH AntiFraud{
         n=Start.size();
         Start = SELECT s
                 FROM Start:s
-                WHERE s.score != 0;
+                WHERE s.score != -1;
         print Start.size()*1.0/n;
 	print Start.size();
         
